@@ -1,0 +1,19 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2013
+Project("{C2299092-16BA-E4A3-2647-829D07A75EC7}") = "A2MLEngine", "A2MLEngine.vcxproj", "{2A4A8842-6B7A-09BA-D9AA-26AD984250A5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2A4A8842-6B7A-09BA-D9AA-26AD984250A5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2A4A8842-6B7A-09BA-D9AA-26AD984250A5}.Debug|Win32.Build.0 = Debug|Win32
+		{2A4A8842-6B7A-09BA-D9AA-26AD984250A5}.Release|Win32.ActiveCfg = Release|Win32
+		{2A4A8842-6B7A-09BA-D9AA-26AD984250A5}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
