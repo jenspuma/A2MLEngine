@@ -1,0 +1,1041 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Relax-NG validation schema for the Advanced/Audio Mobile Markup Language [A2ML]                                      
+	- Version 3.5.7
+	- Last modification: 02/03/2010
+	- Author: Lasorsa Yohan, INRIA Research Center, Team WAM
+-->
+<grammar ns="a2ml" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+
+	<start>
+		<element name="a2ml">
+			<!--
+				The audio cues define the play logic and behavior for the sound sources and may be routed into sub sections.
+			-->
+			<optional>
+				<element name="cues">
+					<zeroOrMore>
+						<ref name="cue"/>
+					</zeroOrMore>
+				</element>		
+			</optional>		
+			<!--
+				Allows to specify actions for dynamic changes in the audio flow.
+			-->
+			<optional>
+				<element name="actionSequences">
+					<zeroOrMore>
+						<ref name="actionSequence"/>
+					</zeroOrMore>
+				</element>		
+			</optional>		
+			<!--
+				The different sections defining the mix parameters of the audio groups.
+			-->
+			<optional>
+				<element name="sections">
+					<interleave>
+						<!-- 
+							The master section contains all the global parameters that are applied at the final stage of the mix.
+							It also allows to define the spectactor settings that will be used in coordination with the 3D sound sources.
+						-->
+						<optional>
+							<element name="masterSection">
+								<ref name="mixAttributes"/>
+								<interleave>
+									<optional>
+										<element name="auditor">
+											<ref name="auditorControls"/>
+										</element>
+									</optional>
+									<ref name="masterControls"/>
+								</interleave>
+							</element>
+						</optional>			
+						<!--
+							The sections allow to define separate audio groups for mixing, applying sound effects and  positionate
+							sounds into a 3D environment.
+						-->
+						<zeroOrMore>
+                            <element name="section">
+                                <attribute name="id">
+                                    <data type="ID"/>
+                                </attribute>
+                                <ref name="cueReferences"/>
+                                <ref name="mixAttributes"/>
+                                <optional>
+                                    <element name="mix3D">
+                                        <ref name="mix3DControls"/>
+                                    </element>				
+                                </optional>
+                                <ref name="sectionControls"/>
+                            </element>
+						</zeroOrMore>
+					</interleave>
+				</element>		
+			</optional>
+		</element>
+	</start>
+
+<!--*******************************************************************************************************************************-->	
+
+	<!-- Reference to a previously defined cue by its ID -->
+	<define name="cueReferences">
+		<attribute name="cues">
+			<data type="IDREFS"/>
+		</attribute>
+	</define>
+	
+	<!-- 
+		A cue is a managed sound source that can be controlled by time or special events. 
+		It is a container for one or more audio chunks.
+	-->
+	<define name="cue">
+		<element name="cue">
+			<attribute name="id">
+				<data type="ID"/>
+			</attribute>
+			<!-- Space-separated list of events or time triggering the start of the cue. -->
+			<optional>
+				<attribute name="begin">
+					<ref name="eventOrTimeList"/>
+				</attribute>
+			</optional>
+			<!-- 
+				Duration of the cue. 
+				If not specified, the cue will be played until the loopCount value is reached. 
+			-->
+			<optional>
+				<attribute name="dur">
+					<ref name="time"/>
+				</attribute>
+			</optional>
+			<!-- Space-separated list of events or time triggering the stop of the cue. -->
+			<optional>
+				<attribute name="end">
+					<ref name="eventOrTimeList"/>
+				</attribute>
+			</optional>
+			<!-- 
+				Begin/End events on this cue will be delayed to the next quantization value set here.
+				Example: set it to 1s and the cue will start and stop on 1s aligned time values.				
+				The duration of the cue is not affected by the quantization, as well as direct start/stop calls.
+				Default value is 0, which means that no quantization is applied.
+			-->
+			<optional>
+				<attribute name="quantize">
+					<ref name="time"/>
+				</attribute>
+			</optional>
+			<!-- 			
+				Number of times the cue should be played. If set to -1, the cue will repeat	undefinitely. 
+				Value 0 is invalid. Default value is 1.
+			-->
+			<optional>
+				<attribute name="loopCount">
+					<data type="int"/>
+				</attribute>
+			</optional>
+			<!--
+				Allows prioritizing the playback of a cue by setting a priority level between 0 and 100. 100 being 
+				the highest	priority, 50 the default level and zero the lowest priority.
+			-->
+			<optional>			
+				<attribute name="priority">
+					<data type="int"/>
+				</attribute>			
+			</optional>
+			<!--
+				Defines the behavior of the cue when a start request is triggered while it is already playing.
+				- Always will cause the cue to restart every time a start is requested, thus only 1 instance of
+				this cue will be used.
+				- Auto will cause the oldest instance of the cue to restart only when the system is running out 
+				of available cue instances (defined by the spawn control, either at the cue or the master level).				
+				- Never will never cause the cue to restart. If the system is running out of cue instances, then
+				the start request will be ignored.
+				The default value is auto.
+			-->
+			<optional>			
+				<attribute name="restartOnRetrigger">
+					<choice>
+						<value>auto</value>
+						<value>always</value>
+						<value>never</value>
+					</choice>
+				</attribute>			
+			</optional>
+			<!--
+				Defines how the audio elements of the cue will use the memory:
+				- When set to true, the audio elements will be streamed directly from the source media, saving memory.
+				This behavior is recommanded for long audio files, like digitalized music. Be careful, as activating 
+				the streaming of a cue will limit it to 1 maximum instance.
+				- When set to false, the audio elements will be loaded and played directly from memory. This is 
+				recommanded for short audio files, like sound fx, and allows for unlimited instances of the cue to be
+				played (unless restrictions from the spawn control).
+			-->
+			<optional>			
+				<attribute name="stream">
+					<data type="boolean"/>
+				</attribute>			
+			</optional>			
+			<oneOrMore>	
+				<ref name="chunk"/>
+			</oneOrMore>
+			<ref name="playbackControls"/>
+		</element>
+	</define>
+	
+	<!-- A chunk is an audio fragment embedding one or more sounds that can be played in order or randomly. -->
+	<define name="chunk">
+		<element name="chunk">
+			<!-- Optional ID, set if you want to expose the events generated by this chunk. -->
+			<optional>
+				<attribute name="id">
+				<data type="ID"/>
+				</attribute>
+			</optional>			
+			<!-- 
+				Duration of the chunk in seconds. 
+				If not specified, the current sound will be played until the end of the media. 
+			-->
+			<optional>
+				<attribute name="dur">
+					<ref name="time"/>
+				</attribute>
+			</optional>			
+			<!-- Determines how the sounds are picked. Default value is "ordered". -->
+			<optional>
+				<attribute name="pick">
+					<ref name="pickMethods"/>					
+				</attribute>
+			</optional>
+			<!-- 
+				Sets the fade in type for the chunk. Default value is "none". 
+				If the previous chunk has set "crossfade" as its fade out type, the fade in properties will be ignored.
+			-->
+			<optional>
+				<attribute name="fadeInType">
+					<choice>
+						<value>none</value>
+						<value>simplefade</value>
+					</choice>
+				</attribute>
+			</optional>
+			<!-- Sets the duration of the fade in transition, in seconds. Default value is 1. -->
+			<optional>
+				<attribute name="fadeInDur">
+					<ref name="time"/>
+				</attribute>
+			</optional>					
+			<!-- Sets the fade type for the transition with the next chunk. Default value is "none". -->
+			<optional>
+				<attribute name="fadeOutType">
+					<choice>
+						<value>none</value>
+						<value>simplefade</value>
+						<value>crossfade</value>
+					</choice>
+				</attribute>
+			</optional>
+			<!-- Sets the duration of the fade transition, in seconds. Default value is 1. -->
+			<optional>
+				<attribute name="fadeOutDur">
+					<ref name="time"/>
+				</attribute>
+			</optional>			
+			<!-- The current active sound, by index. Default value is 0 (first sound). -->
+			<optional>
+				<attribute name="activeSound">
+					<data type="int"/>
+				</attribute>
+			</optional>			
+			<oneOrMore>
+				<ref name="sound"/>
+			</oneOrMore>
+			<ref name="playbackControls"/>
+		</element>
+	</define>
+	
+	<!-- A sound is the most basic audio element. -->
+	<define name="sound">
+		<element name="sound">
+			<!-- The audio source file. -->
+			<attribute name="src"/>
+			<!-- 
+				Define the probability of this sound to be picked between all sounds if the chunk pick mode is set to random.
+				Probability is defined as relative to other sounds values, and must be positive.
+				Default value is 1.
+			-->
+			<optional>
+				<attribute name="pickPriority">
+					<data type="int"/>
+				</attribute>		
+			</optional>
+			<!-- 
+				Number of times the sound will loop and play the content of its audio source. If set to -1, the	sound will 
+				repeat undefinitely. Value 0 is invalid. Default value is 1. 
+			-->
+			<optional>
+				<attribute name="loopCount">
+					<data type="int"/>
+				</attribute>		
+			</optional>
+			<!-- Space-separated list of events or time that will set the current sound as the active one. -->
+			<optional>
+				<attribute name="setActive">
+					<ref name="eventOrTimeList"/>
+				</attribute>
+			</optional>
+			<ref name="mixAttributes"/>
+			<ref name="soundControls"/>
+			<ref name="playbackControls"/>
+		</element>
+	</define>
+	
+	<!-- An action sequence allows to specify actions to make dynamic changes in the audio flow. -->
+	<define name="actionSequence">
+		<element name="actionSequence">
+			<attribute name="id">
+				<data type="ID"/>
+			</attribute>
+			<!-- Space-separated list of events or time triggering the start of the action sequence. -->
+			<optional>
+				<attribute name="begin">
+					<ref name="eventOrTimeList"/>
+				</attribute>
+			</optional>
+			<!-- 
+				Begin events on this action sequence will be delayed to the next quantization value set here.
+				Example: set it to 1s and the action sequence will start on the next 1s aligned time value when triggered.				
+				Default value is 0, which means that no quantization is applied.
+			-->
+			<optional>
+				<attribute name="quantize">
+					<ref name="time"/>
+				</attribute>
+			</optional>
+			<!-- The dynamic changes are specified by a sequence or a choice among multiple sequences. -->
+			<choice>
+				<ref name="choice"/>
+				<ref name="sequence"/>
+			</choice>
+		</element>
+	</define>	
+	
+	<!-- Allows to define multiple choices between action sequences. -->
+	<define name="choice">
+		<element name="choice">
+			<!-- Determines how the sequences are picked. Default value is "ordered". -->
+			<optional>
+				<attribute name="pick">
+					<ref name="pickMethods"/>
+				</attribute>
+			</optional>
+			<oneOrMore>
+				<ref name="sequence"/>
+			</oneOrMore>
+		</element>
+	</define>
+	
+	<!-- A sequence definition that can modify the current audio flow. -->
+	<define name="sequence">
+		<element name="sequence">
+			<!-- 
+				Define the probability of this sequence to be picked between all sequences if inside a choice block and
+				the choice pick mode is set to random.
+				Probability is defined as relative to other sequences values, and must be positive.
+				Default value is 1.
+			-->
+			<optional>
+				<attribute name="pickPriority">
+					<data type="int"/>
+				</attribute>		
+			</optional>
+			<!-- The actions to do when the sequence is picked. -->
+			<oneOrMore>
+				<choice>
+					<!-- 
+						Queues the specified source cue after the target cue.
+						The chunk transition of the target cue will be applied with the first chunk of the source cue.
+					-->
+					<element name="queue">
+						<!-- The cue that will be queued after the source cue. -->
+						<attribute name="source">
+							<data type="IDREFS"/>
+						</attribute>
+						<!-- The cue on which the queue will be applied. -->
+						<attribute name="target">
+							<data type="IDREFS"/>
+						</attribute>						
+					</element>
+					<!-- Starts the specified cue, animation or flow sequence (a chunk can't be targetted). -->
+					<element name="start">
+						<!-- The identified object to start. -->
+						<attribute name="target">
+							<data type="IDREFS"/>
+						</attribute>
+					</element>
+					<!-- Stops the specified cue or animation (a chunk or flow sequence can't be targetted). -->
+					<element name="stop">
+						<!-- The identified object to stop. -->
+						<attribute name="target">
+							<data type="IDREFS"/>
+						</attribute>
+					</element>					
+					<!-- Raise the specified event. -->
+					<element name="raise">
+						<!-- The event name to raise. -->
+						<attribute name="eventName">
+							<data type="string"/>
+						</attribute>
+					</element>						
+					<!-- Mute the specified cue or section (use "MasterSection" to target the master section). -->
+					<element name="mute">
+						<!-- The cue or section to mute. -->
+						<attribute name="target">
+							<data type="IDREFS"/>
+						</attribute>
+					</element>						
+					<!-- Unmute the specified cue or section (use "MasterSection" to target the master section). -->
+					<element name="unmute">
+						<!-- The cue or section to unmute. -->
+						<attribute name="target">
+							<data type="IDREFS"/>
+						</attribute>
+					</element>						
+				</choice>				
+			</oneOrMore>
+		</element>
+	</define>		
+	
+	<!-- Pick methods for choosing among multiple elements. -->
+	<define name="pickMethods">
+		<choice>
+			<value>ordered</value>
+			<value>random</value>
+			<value>exclusiveRandom</value>
+			<value>reversed</value>
+			<value>fixed</value>
+		</choice>
+	</define>
+	
+	<!-- Standard mixing control elements and various sound effect control elements available for the sub sections.. -->
+	<define name="sectionControls">
+		<interleave>
+			<ref name="volumeControl"/>
+			<ref name="panControl"/>
+			<ref name="dspControl"/>
+		</interleave>
+	</define>
+	
+	<!-- Standard mixing control elements and various sound effect control elements available for the master section.   -->
+	<define name="masterControls">
+		<interleave>
+			<ref name="volumeControl"/>
+			<ref name="panControl"/>
+			<ref name="dspControl"/>
+			<ref name="tempoControl"/>
+			<ref name="spawnControl"/>
+		</interleave>
+	</define>
+
+	<!-- Specify various control parameters for the auditor. -->
+	<define name="auditorControls">
+		<interleave>
+			<ref name="dopplerControl"/>
+			<ref name="orientationControl"/>
+			<ref name="locationControl"/>	
+		</interleave>
+	</define>
+
+	<!-- Specify various control parameters for a 3D-positioned sound source. -->
+	<define name="mix3DControls">
+		<interleave>
+			<ref name="dopplerControl"/>
+			<ref name="orientationControl"/>
+			<ref name="locationControl"/>	
+			<ref name="directivityControl"/>
+			<ref name="distanceAttenuationControl"/>
+			<ref name="macroscopicControl"/>
+			<ref name="obstructionControl"/>
+		</interleave>
+	</define>
+	
+	<!-- Specify sound special control elements. -->
+	<define name="soundControls">
+		<interleave>
+			<ref name="volumeControl"/>
+			<ref name="panControl"/>
+			<ref name="rateControl"/>
+			<ref name="pitchControl"/>
+		</interleave>
+	</define>
+	
+	<!-- Specify special playback control elements. -->
+	<define name="playbackControls">
+		<interleave>
+			<ref name="tempoControl"/>
+			<ref name="triggerControl"/>
+			<ref name="spawnControl"/>
+		</interleave>
+	</define>
+	
+	<!-- 
+		Special mix controls attributes. 
+		Allow quick and easy access to the mix control parameters.
+	-->
+	<define name="mixAttributes">
+		<optional>
+			<attribute name="volume">
+				<data type="int"/>
+			</attribute>		
+		</optional>
+		<optional>
+			<attribute name="pan">
+				<data type="int"/>
+			</attribute>
+		</optional>
+	</define>
+	
+<!--*******************************************************************************************************************************-->	
+
+	<!-- Allows to modify the output volume of the audio track. -->
+	<define name="volumeControl">
+		<optional>
+			<element name="volumeControl">
+				<!-- The output volume of the audio track, ranging from 0 to 100 with a linear scale. -->
+				<optional>
+					<attribute name="level">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<!-- Mute/unmute the audio track. -->
+				<optional>
+					<attribute name="mute">
+						<data type="boolean"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!--
+		Allows to specify the panning of the audio track.
+	-->
+	<define name="panControl">
+		<optional>
+			<element name="panControl">
+				<!--
+					The panning of the audio track, ranging from -100 to 100, where 0 represents panning for
+					both channels, -100 full panning to the left, and 100 full panning to the right, with a linear scale.				
+				-->
+				<optional>
+					<attribute name="pan">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!--
+		Allows to control any DSP parameter such as reverb, chorus, equalizer...
+		The DSP available depends of the target platform and implementation, and should be referenced with their parameters
+		in a separate document.
+	-->
+	<define name="dspControl">
+		<optional>
+			<element name="dspControl">
+				<attribute name="dspName">
+					<data type="string"/>
+				</attribute>
+				<oneOrMore>
+					<element name="parameter">
+						<attribute name="name">
+							<data type="string"/>
+						</attribute>
+						<attribute name="value">
+							<data type="string"/>
+						</attribute>
+					</element>
+				</oneOrMore>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!-- Specify the settings of the Doppler effect for a 3D sound source. -->
+	<define name="dopplerControl">
+		<optional>
+			<element name="dopplerControl">
+				<!-- Sets the velocity used in calculations for the Doppler effect. -->
+				<optional>
+					<attribute name="velocity">
+						<list>
+							<data type="int"/>	<!-- x -->
+							<data type="int"/>	<!-- y -->
+							<data type="int"/>	<!-- z -->
+						</list>
+					</attribute>
+				</optional>
+				<ref name="commonControlElements"/>
+			</element>
+		</optional>
+	</define>
+	
+	<!-- Specify the orientation settings for an object in the virtual acoustic space. -->
+	<define name="orientationControl">
+		<optional>
+			<element name="orientationControl">
+				<!-- Turns the object to the new orientation. -->
+				<optional>
+					<attribute name="orientation">
+						<list>
+							<data type="int"/>	<!-- heading -->
+							<data type="int"/>	<!-- pitch -->
+							<data type="int"/>	<!-- roll -->
+						</list>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!-- Specify the location of an object in the virtual acoustic space. -->
+	<define name="locationControl">
+		<optional>
+			<element name="locationControl">
+				<!-- Moves the object to the new location. -->
+				<optional>
+					<attribute name="location">
+						<list>
+							<data type="int"/>	<!-- x -->
+							<data type="int"/>	<!-- y -->
+							<data type="int"/>	<!-- z -->
+						</list>
+					</attribute>
+				</optional>
+				<!-- 
+					Automatically calculates the doppler velocity from the location changes of the 3D source.
+					The velocity is calculated as a linear interpolation of location differences over time.
+					Once enabled, the 'velocity' attribute of the DopplerControl then has no effect.
+					The default value is false.
+				-->
+				<optional>
+					<attribute name="enableAutomaticDoppler">
+						<data type="boolean"/>
+					</attribute>
+				</optional>				
+				<!-- 
+					Applies the specified factor to the doppler velocity, to enhance or reduce the doppler effect.
+					This attribute has effect only if the 'enableAutomaticDoppler' attribute is set to true.
+					Default value is 1.					
+				-->
+				<optional>
+					<attribute name="dopplerFactor">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!-- Specify the directivity pattern of a 3D sound source. -->
+	<define name="directivityControl">
+		<optional>
+			<element name="directivityControl">
+				<!-- Sets the directivity parameters. -->
+				<optional>
+					<attribute name="directivity">
+						<list>
+							<data type="int"/>	<!-- minAngle -->
+							<data type="int"/>	<!-- maxAngle -->
+							<data type="int"/>	<!-- rearLevel -->
+						</list>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+	
+	<!-- Controls how the sound from a 3D sound source is attenuated with its distance from the spectator. -->
+	<define name="distanceAttenuationControl">
+		<optional>
+			<element name="distanceAttenuationControl">
+				<!-- Sets the attenuation parameters. -->
+				<optional>
+					<attribute name="attenuation">
+						<list>
+							<data type="int"/>		<!-- minDistance -->
+							<data type="int"/>		<!-- maxDistance -->
+							<data type="boolean"/>	<!-- muteAfterMax -->
+							<data type="int"/>		<!-- rolloffFactor -->
+						</list>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!-- Specify the macroscopic behavior of a 3D sound source. -->
+	<define name="macroscopicControl">
+		<optional>
+			<element name="macroscopicControl">
+				<!-- Sets the size of the audio source. -->
+				<optional>
+					<attribute name="size">
+						<list>
+							<data type="int"/>	<!-- x -->
+							<data type="int"/>	<!-- y -->
+							<data type="int"/>	<!-- z -->
+						</list>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!-- Specify how much of the direct sound from a 3D sound source can be heard. -->
+	<define name="obstructionControl">
+		<optional>
+			<element name="obstructionControl">
+				<!-- 
+					Sets the level at which high frequency components will be transmitted directly from the
+					source, in mB. The value must be non-positive. If 0, the source's frequency response
+					will be flat.
+				-->
+				<optional>
+					<attribute name="HFLevel">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<!-- 
+					Sets the overall level that will be transmitted from the source, in mB. 
+					The value must be non-positive. If 0, the source will be non-obstructed.
+				-->
+				<optional>
+					<attribute name="level">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+
+	<!-- Allows to control the playback rate of a sound. -->
+	<define name="rateControl">
+		<optional>
+			<element name="rateControl">
+				<!-- Sets the rate as a milli-percentage, 100'000 being the default rate. -->
+				<optional>
+					<attribute name="rate">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+	
+	<!-- Allows to raise or lower the pitch of the sound without changing the playback speed. -->
+	<define name="pitchControl">
+		<optional>
+			<element name="pitchControl">
+				<!-- Sets the relative pitch shift, in milli-semitones. The default value is 0 -->
+				<optional>
+					<attribute name="pitch">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>	
+
+	<!-- Standard elements shared by most audio controls. -->
+	<define name="commonControlElements">
+		<optional>
+			<attribute name="enabled">
+				<data type="boolean"/>
+			</attribute>
+		</optional>
+		<ref name="animate"/>
+	</define>
+	
+	<!-- Allows to control the trigger frequency of the parent. -->
+	<define name="triggerControl">
+		<optional>
+			<element name="triggerControl">
+				<!-- The chance percentage that the parent will play each time a start action on it is triggered. Default is 100. -->
+				<optional>
+					<attribute name="chance">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<!-- 
+					Automatically triggers a start action on the parent with the given time interval.
+					Value must be positive, and 0 disables the autostart.
+					Default value is 0. 
+				-->
+				<optional>
+					<attribute name="autoStart">
+						<ref name="time" />
+					</attribute>
+				</optional>				
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+	
+	<!-- 
+		Controls the parent's tempo base. It also affects all children elements that doesn't have their
+		own tempo definition.
+		Default tempo for the master section is 120 BPM.
+	-->
+	<define name="tempoControl">
+		<optional>
+			<element name="tempoControl">
+				<!-- The tempo base, in BPM (beats per minute). -->
+				<optional>
+					<attribute name="tempo">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+	
+	<!-- 
+		Controls the way audio elements are instanciated.
+	-->
+	<define name="spawnControl">
+		<optional>
+			<element name="spawnControl">
+				<!-- 
+					The maximum number of instances allowed for the parent element (does not affect children).
+					If used in the master section, controls the maximum number of cue instances. 
+					Default value is -1, which means unlimited instances allowed.
+				-->
+				<optional>
+					<attribute name="maxInstances">
+						<data type="int"/>
+					</attribute>
+				</optional>
+				<ref name="animate"/>
+			</element>
+		</optional>
+	</define>
+	
+	<!-- Allows time or event based parameter animation. -->
+	<define name="animate">
+		<zeroOrMore>
+			<element name="animate">
+	            <attribute name="id">
+	            	<data type="ID"/>
+	            </attribute>
+				<!-- 
+					The name of the attribute that will be animated.
+					Some special attribute names may be used, allowing to set multiple parameters at the 
+					same time; in that case the animation will only works with events using their associated
+					event data as the source values to set the parameters. The event data then must contains
+					all values needed binded on the parameters names, i.e. if the special attribute
+					"velocity" is used, the event data must contains "X", "Y", and "Z" values.
+				-->
+				<attribute name="attribute">
+					<data type="string"/>
+				</attribute>
+				<!-- Space-separated list of events or time triggering the start of the animation. -->
+	            <optional>
+	                <attribute name="begin">
+	                    <ref name="eventOrTimeList"/>
+	                </attribute>
+	            </optional>
+				<!-- Space-separated list of events or time triggering the stop of the animation. -->
+	            <optional>
+	                <attribute name="end">
+	                    <ref name="eventOrTimeList"/>
+	                </attribute>
+	            </optional>
+				<!-- Duration of the animation. Default value is undefined. -->
+	            <optional>
+	                <attribute name="dur">
+	                    <ref name="time"/>
+	                </attribute>
+	            </optional>
+				<!-- 
+					Number of times the animation should be played. This number may be fractional, thus
+					only a part of the last repetition may be done.	If set to -1, the animation will repeat 
+					undefinitely. Value 0 is invalid. Default value is 1.
+				-->
+				<optional>
+	                <attribute name="repeatCount">
+	                    <data type="float"/>
+	                </attribute>
+	            </optional>
+				<!-- 
+					Active duration of the animation. The animation may be repeated many times along the
+					specified duration. Default value is undefined. 
+				-->
+	            <optional>
+	                <attribute name="repeatDur">
+	                	<ref name="time"/>
+	                </attribute>
+	            </optional>				
+				<!-- Starting value of the animation. -->
+	            <optional>
+	                <attribute name="from">
+	                	<ref name="data"/>
+	                </attribute>
+	            </optional>
+				<!-- Ending value of the animation. -->				
+	            <optional>
+	                <attribute name="to">
+	                	<ref name="data"/>
+	                </attribute>
+	            </optional>
+				<!-- Relative offset for the value of the animation. -->
+	            <optional>
+	                <attribute name="by">
+	                	<ref name="data"/>
+	                </attribute>
+	            </optional>
+				<!-- 
+					A space-separated list of one or more values for the animation.
+					The animation will use a linear interpolation between those values equally spaced through 
+					the animation duration.
+				-->
+				<optional>
+	                <attribute name="values">
+						<list>
+							<ref name="data"/>
+						</list>
+	                </attribute>
+				</optional>					
+				<!-- 
+					Animate the specified attribute (or set of attributes) using the data received with an event.
+					You can use the value "none" to disable it or postpone the ".default" suffix to an event name
+					to animate the attribute (or set of attributes) using the data provided with the event, 
+					searching for values with the default attribute(s) name(s), eg:
+					- when animating a single attribute, for example the attribute "level" of a volume control, 
+					  the data provided with the event will be used directly (it must be an integer).
+					  You can also specify manually which named value to search in the event data if a value set 
+					  is provided by using the "." + value name suffix instead of ".default", for example 
+					  "eventName.level".				
+					- when animation an attribute set, for example the "location" of a location control,
+					  the values named "X", "Y" and "Z" will be searched in the value set provided with the event.
+                    If no suitable values are found inside the data provided with the specified event, this setting 
+					has no effect.
+					The default value is "none".
+				-->
+				<optional>
+	                <attribute name="eventValue">
+						<data type="string"/>
+	                </attribute>
+				</optional>
+				<!-- 
+					Specify whether the animated value should be set to the ending value of the animation or
+					restored to its original value after the end of the animation. Default value is "remove".
+				-->
+	            <optional>
+	                <attribute name="fill">
+	                    <choice>
+	                        <value>remove</value>
+	                        <value>freeze</value>
+	                    </choice>
+	                </attribute>
+	            </optional>				
+				<!-- 
+					Defines how the animation function interacts with itself, across repeat iterations. 
+					Default value is "none".
+				-->
+	            <optional>
+	                <attribute name="accumulate">
+	                    <choice>
+	                        <value>none</value>
+	                        <value>sum</value>
+	                    </choice>
+	                </attribute>
+	            </optional>				
+			</element>
+		</zeroOrMore>
+	</define>
+
+<!--*******************************************************************************************************************************-->	
+
+	<!-- A mixed list of time or event values. -->
+	<define name="eventOrTimeList">
+		<list>
+			<oneOrMore>
+				<choice>
+					<ref name="time"/>
+					<ref name="event"/>
+				</choice>
+			</oneOrMore>
+		</list>
+	</define>
+	
+	<!-- 
+		A time definition value.
+		It can be based on absolute time (in minutes, seconds or milliseconds) or on the tempo of the closest parent
+		tempo definition (in bars, beats or ticks).
+		The default unit is the second. The unit can be changed by postfixing it to the value:
+		- m: minutes, example: 1.5m
+		- s: seconds, example: 3s
+		- ms: milliseconds, example: 350ms
+		- B: bars, example: 2B
+		- b: beats, example: 4b
+		- t: ticks, example: 96t
+		Note that there is 384 ticks in a beat.
+		
+		The value can also be defined by these random expressions:
+		- rand(<min>, <max>): any random value between min (included) and max (excluded) will be chosen. Example: rand(4, 5)m
+		will chose any time between 4 and 5 minutes.
+		- rand(<min>, <max>, <interval>): a random value between min and max will be chose, with the specified interval between
+		the values. Example: rand(1, 4, 1)b will chose any beat from 1 to 4 beats.  
+	-->
+	<define name="time">
+		<data type="string"/>
+	</define>
+	
+	<!-- 
+		An event definition value.
+		Events from identifiable audio elements (cue, animations) are prefixed by the ID of these elements. All instances of these
+		elements will generate and react to these events. To internally use the events of the current instance of these elements, use
+		the keyword "this".
+		Example, for cue element with the ID "myCue": 
+		- if the end attribute is set to "myCue.repeat", all instances of this cue will stop when 1 instance will repeat.
+		- if the end attribute is set to "this.repeat", only the concerned instance will stop when it repeats. Other instances are
+		unaffected.
+		
+		An additional time offset can be postfixed to the event, in the form: <event>+-<time_value>
+		Example: key.pressed+rand(0, 10)s will start the event trigger after a random delay of 0 to 10 seconds.
+		
+		Negative offset will cause the event trigger to start immediately, but to act like if it was started the time of the offset
+		ago, for example an animation will base it started time on this past time value to calculate the animated value.
+	-->
+	<define name="event">
+		<data type="string"/>
+	</define>	
+	
+	<!-- 
+		A data definition value.
+		Usually an integer or a float, the value can also be defined by a random expression:
+		- rand(<min>, <max>): any random value between min (included) and max (excluded) will be chosen. Example: rand(4, 5)m
+		will chose any time between 4 and 5 minutes.
+		- rand(<min>, <max>, <interval>): a random value between min and max will be chose, with the specified interval between
+		the values. Example: rand(1, 4, 1) will chose any value within 1, 2 or 3. 
+	-->
+	<define name="data">
+		<data type="string"/>
+	</define>		
+	
+</grammar>

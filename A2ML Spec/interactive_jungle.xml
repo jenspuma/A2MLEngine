@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?oxygen RNGSchema="amml_v3.5.6.rng" type="xml"?>
+<amml xmlns="amml">    
+    <cues>
+        <cue id="river" begin="0s" loopCount="-1">
+            <chunk pick="exclusiveRandom" fadeOutType="crossfade" fadeOutDur="0.5s">
+                <sound src="/river_1-1.wav"/>
+                <sound src="/river_1-2.wav"/>
+                <sound src="/river_1-3.wav"/>
+            </chunk>
+            <chunk pick="exclusiveRandom" fadeOutType="crossfade" fadeOutDur="0.5s">
+                <sound src="/river_2-1.wav"/>
+                <sound src="/river_2-2.wav"/>
+                <sound src="/river_2-3.wav"/>
+            </chunk>
+        </cue>      
+        <cue id="wind" begin="0s" loopCount="-1">
+            <chunk pick="random" fadeOutType="crossfade" fadeOutDur="0.5s">
+                <sound src="/wind_1-1.wav"/>
+                <sound src="/wind_1-2.wav"/>
+                <sound src="/wind_1-3.wav"/>
+                <sound src="/wind_1-4.wav"/>
+            </chunk>
+            <chunk pick="exclusiveRandom" fadeOutType="crossfade" fadeOutDur="0.5s">
+                <sound src="/wind_strong_1.wav"/>
+                <sound src="/wind_strong_2.wav"/>
+                <triggerControl chance="10"/>    <!-- triggers sometimes a stronger wind loop -->
+            </chunk>
+        </cue>
+        <cue id="rain" loopCount="-1">    <!-- cue is triggered using flow control -->
+            <chunk pick="random" fadeOutType="crossfade" fadeOutDur="1s">
+                <sound src="/rain_1-1.wav"/>
+                <sound src="/rain_1-2.wav"/>
+                <sound src="/rain_1-3.wav"/>
+            </chunk>
+        </cue>        
+        <cue id="crickets" dur="rand(3, 10)s" restartOnRetrigger="never">
+            <chunk pick="random" fadeInType="simplefade" fadeInDur="0.5s" fadeOutType="simplefade" fadeOutDur="0.5s">
+                <sound src="crickets_1.wav" pickPriority="3"/>
+                <sound src="crickets_2.wav" pickPriority="2"/>
+                <sound src="crickets_3.wav" pickPriority="1"/>
+                <sound src="crickets_4.wav" pickPriority="1"/>
+            </chunk>
+            <triggerControl autoStart="rand(0, 5)s"/>
+            <spawnControl maxInstances="4"/>    <!-- no more than 4 crickets cues at the same time -->
+        </cue>         
+        <cue id="fly" restartOnRetrigger="never">
+            <chunk pick="exclusiveRandom" dur="rand(5, 20)s" fadeInType="simplefade" fadeInDur="2s" fadeOutType="simplefade" fadeOutDur="2s">
+                <sound src="/fly_1.wav" pickPriority="2" loopCount="-1"/>
+                <sound src="/fly_2.wav" pickPriority="1" loopCount="-1"/>
+                <sound src="/fly_3.wav" pickPriority="1" loopCount="-1"/>
+            </chunk>            
+            <spawnControl maxInstances="1"/>    <!-- no more than 1 fly cue at the same time -->
+            <triggerControl chance="10" autoStart="rand(5, 20)s"/>       <!-- randomize the trigger -->
+        </cue>
+        <cue id="bird" end="shot.start" restartOnRetrigger="never">
+            <chunk pick="exclusiveRandom" dur="rand(3, 10)s" fadeOutType="simplefade" fadeOutDur="1s">
+                <sound src="/bird_1.wav" pickPriority="3" loopCount="-1"/>
+                <sound src="/bird_2.wav" pickPriority="2" loopCount="-1"/>
+                <sound src="/bird_3.wav" pickPriority="2" loopCount="-1"/>
+                <sound src="/bird_4.wav" pickPriority="1" loopCount="-1"/>
+                <sound src="/bird_5.wav" pickPriority="1" loopCount="-1"/>
+            </chunk>
+            <spawnControl maxInstances="2"/>    <!-- no more than 2 birds cues at the same time -->
+            <triggerControl chance="20" autoStart="rand(0, 10)s">
+                <animate id="more_sparse_birds_anim" attribute="chance" begin="shot.start" dur="rand(10, 20)s" from="rand(0, 3)" by="rand(0, 5)" fill="remove"/>
+            </triggerControl>
+        </cue>
+        <cue id="monkeys" end="shot.start" restartOnRetrigger="never">
+            <chunk pick="exclusiveRandom" fadeOutType="simplefade" fadeOutDur="1s">
+                <sound src="/monkeys_1.wav"/>
+                <sound src="/monkeys_2.wav"/>
+                <sound src="/monkeys_3.wav"/>
+                <sound src="/monkeys_4.wav"/>
+            </chunk>
+            <spawnControl maxInstances="2"/>    <!-- no more than 2 monkeys cues at the same time -->
+            <triggerControl chance="15" autoStart="rand(0, 10)s">
+                <animate id="more_sparse_monkeys_anim" attribute="chance" begin="shot.start" dur="rand(10, 20)s" from="rand(0, 3)" by="rand(0, 5)" fill="remove"/>
+            </triggerControl>
+        </cue>
+        <cue id="shot" begin="player.shot" loopCount="1" restartOnRetrigger="always">
+            <chunk pick="random" fadeOutType="simplefade" fadeOutDur="1s">
+                <sound src="/shot_1.wav"/>
+                <sound src="/shot_2.wav"/>
+                <sound src="/shot_3.wav"/>
+            </chunk>
+        </cue>        
+    </cues>
+    
+    <audioFlow>
+        <flowControl id="weather" begin="weather.change">
+            <choice pick="ordered">
+                <sequence>
+                    <queue source="rain" target="wind"/>
+                </sequence>
+                <sequence>
+                    <queue source="wind" target="rain"/>
+                </sequence>                
+            </choice>
+        </flowControl>
+    </audioFlow>
+    
+    <sections>
+        <masterSection volume="100">        
+            <auditor>
+                <locationControl location="0 0 0"/>
+                <orientationControl orientation="0 0 1"/>
+            </auditor>
+            <dspControl dspName="reverb">
+                <parameter name="preset" value="forest"/>
+            </dspControl>
+        </masterSection>
+        <section id="ambiance" cues="river wind crickets">            
+            <volumeControl level="60"/>
+        </section>
+        <section id="animals" cues="bird monkeys">
+            <volumeControl level="100">
+                <animate id="quiet_animals_anim" attribute="level" from="rand(25, 40)" to="100" dur="rand(10, 20)" fill="remove"/>
+            </volumeControl>
+        </section>
+        <section id="river_3D" cues="river">
+            <mix3D>
+                <locationControl location="-10 0 50"/>    <!-- river in front of the auditor on the left -->
+                <macroscopicControl size="2000 100 10000"/>
+            </mix3D>
+        </section>
+        <section id="fly_3D" cues="fly">
+            <mix3D>
+                <locationControl enableAutomaticDoppler="true">
+                    <animate id="fly_3D_anim" attribute="location" eventValue="fly.move.default"/>    <!-- change location by event, needs some program code here -->                
+                </locationControl>
+            </mix3D>
+        </section>
+    </sections>
+        
+</amml>    
