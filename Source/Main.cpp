@@ -13,7 +13,7 @@
 
 
 //==============================================================================
-class A2MLEngineApplication  : public JUCEApplication
+class A2MLEngineApplication  : public JUCEApplication 
 {
 public:
     //==============================================================================
